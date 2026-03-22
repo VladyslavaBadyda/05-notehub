@@ -1,56 +1,69 @@
+import css from "./App.module.css";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useDebouncedCallback } from "use-debounce";
 import { fetchNotes } from "../../services/noteService";
 import NoteList from "../NoteList/NoteList";
+import SearchBox from "../SearchBox/SearchBox";
 import Pagination from "../Pagination/Pagination";
-import css from "./App.module.css";
 import Modal from "../Modal/Modal";
 import NoteForm from "../NoteForm/NoteForm";
-
+import Loader from "../Loader/Loader";
 export default function App() {
-    // 🔹 state сторінки
-    const [page, setPage] = useState(1);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-
-    // 🔹 запит нотаток
-    const { data, isLoading, isError } = useQuery({
-        queryKey: ["notes", page],
-        queryFn: () => fetchNotes(page, ""),
+    const [query, setQuery] = useState("");
+    const [searchText, setSearchText] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [perPage] = useState(12);
+    const [isClicked, setIsClicked] = useState(false);
+    const { data, isError, isLoading } = useQuery({
+        queryKey: ["notes", query, currentPage],
+        queryFn: () => fetchNotes(query, currentPage, perPage),
+        placeholderData: keepPreviousData,
     });
+    const updateSearch = useDebouncedCallback(
+        (event: React.ChangeEvent<HTMLInputElement>) => {
+            setQuery(event.target.value);
+            setSearchText(event.target.value);
+            setCurrentPage(1);
+        },
+        1000,
+    );
 
-    // 🔹 безпечне отримання даних
-    const notes = data?.notes ?? [];
     const totalPages = data?.totalPages ?? 0;
+
+    function handleChangePage(newPage: number) {
+        setCurrentPage(newPage);
+    }
+
+    function handelCloseModal() {
+        setIsClicked(false);
+    }
 
     return (
         <div className={css.app}>
             <header className={css.toolbar}>
-                {/* SearchBox буде тут */}
+                <SearchBox searchText={searchText} updateSearch={updateSearch} />
                 {totalPages > 1 && (
                     <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        onPageChange={setPage}
+                        pageCount={data?.totalPages ?? 0}
+                        currentPage={currentPage}
+                        onPageChange={handleChangePage}
                     />
                 )}
-
-                <button className={css.button} onClick={() => setIsModalOpen(true)}>
+                <button className={css.button} onClick={() => setIsClicked(true)}>
                     Create note +
                 </button>
             </header>
 
-            {isModalOpen && (
-                <Modal onClose={() => setIsModalOpen(false)}>
-                    <NoteForm onClose={() => setIsModalOpen(false)} />
+            {isLoading && <Loader />}
+            {data && data.notes.length > 0 && !isError && (
+                <NoteList notes={data?.notes ?? []} />
+            )}
+            {isClicked && (
+                <Modal onClose={handelCloseModal}>
+                    <NoteForm onClose={handelCloseModal} />
                 </Modal>
             )}
-
-            {/* Стани */}
-            {isLoading && <p>Loading...</p>}
-            {isError && <p>Error loading notes</p>}
-
-            {/* Список нотаток */}
-            {notes.length > 0 && <NoteList notes={notes} />}
         </div>
     );
 }

@@ -1,49 +1,53 @@
 import axios from "axios";
 import type { Note } from "../types/note";
+const myKey = import.meta.env.VITE_NOTEHUB_TOKEN
+const BASE_URL = "https://notehub-public.goit.study/api/notes";
 
-const BASE_URL = "https://notehub-public.goit.study/api";
-
-const token = import.meta.env.VITE_NOTEHUB_TOKEN;
-
-const instance = axios.create({
-    baseURL: BASE_URL,
-    headers: {
-        Authorization: `Bearer ${token}`,
-    },
-});
-
-interface FetchNotesResponse {
+interface FetchNotesProps {
     notes: Note[];
+
     totalPages: number;
 }
 
-export const fetchNotes = async (
-    page: number,
-    search: string,
-): Promise<FetchNotesResponse> => {
-    const response = await instance.get("/notes", {
+export async function fetchNotes(searchText: string, page: number, perPage: number): Promise<FetchNotesProps> {
+    const response = await axios.get<FetchNotesProps>(BASE_URL, {
         params: {
+            search: searchText,
             page,
-            perPage: 12,
-            search,
+            perPage,
         },
+        headers: {
+            Authorization: `Bearer ${myKey}`,
+            accept: "application/json",
+
+        }
     });
-
     return response.data;
-};
-
-interface CreateNotePayload {
-    title: string;
-    content: string;
-    tag: string;
 }
 
-export const createNote = async (payload: CreateNotePayload): Promise<Note> => {
-    const response = await instance.post("/notes", payload);
-    return response.data;
-};
 
-export const deleteNote = async (id: string): Promise<Note> => {
-    const response = await instance.delete(`/notes/${id}`);
-    return response.data;
-};
+interface CreateNoteProps {
+    title: string,
+    content: string | null,
+    tag: 'Todo' | 'Work' | 'Personal' | 'Meeting' | 'Shopping'
+}
+
+export async function createNote(newPost: CreateNoteProps): Promise<Note> {
+    const createNewNote = await axios.post<Note>(BASE_URL, newPost, {
+        headers: {
+            Authorization: `Bearer ${myKey}`,
+            accept: "application/json",
+        },
+    })
+    return createNewNote.data;
+}
+
+export async function deleteNote(noteId: string,): Promise<Note> {
+    const deleteNote = await axios.delete<Note>(`${BASE_URL}/${noteId}`, {
+        headers: {
+            Authorization: `Bearer ${myKey}`,
+            accept: "application/json",
+        }
+    });
+    return deleteNote.data
+}
